@@ -1,0 +1,35 @@
+## Plantilla wordpress para nuevas instalaciones
+<VirtualHost *:${ALSUR_DEF_PORT}>
+DocumentRoot {{DOCUMENT_ROOT}}
+HostNameLookups off
+ServerName {{PROJECT_BASE_URL}}
+
+<IfModule mod_dir.c>
+DirectoryIndex index.php index.html
+</IfModule>
+
+<IfModule mod_php5.c>
+php_value include_path "/home/webs/phplibs"
+#php_value magic_quotes_gpc on
+</IfModule>
+
+<IfModule mod_php7.c>
+php_value include_path "home/webs/phplibs"
+#php_value magic_quotes_gpc on
+</IfModule>
+
+<Directory "{{DOCUMENT_ROOT}}">
+# BEGIN WordPress
+
+RewriteEngine On
+RewriteBase /
+RewriteRule ^index\.php$ - [L]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule . /index.php [L]
+
+# END WordPress
+
+Require all granted
+</Directory>
+</VirtualHost>

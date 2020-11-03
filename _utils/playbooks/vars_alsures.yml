@@ -1,0 +1,20 @@
+---
+PROJECT_DIR: "../../alsures" # ruta donde se va a crear la copia (absoluta) - se puede usar $PWD (ruta actual)
+PROJECT_NAME: alsures # sin puntos (rompe directivas de traefik)
+PROJECT_BASE_URL: alsur.es # dominio sin protocolo
+GIT_REPO:
+
+# WP_CONTENT (a partir de www/)
+WP_CONTENT_DIR_PERSO: # cont
+WP_PLUGIN_DIR_PERSO: # cont/plugins
+WP_CONTENT_URL_PERSO: # $protocolo + $host + ‘cont’
+WP_PLUGIN_URL_PERSO: # $protocolo + $host + ‘cont/plugins’
+
+DOCUMENT_ROOT: # para apache, incluir /www
+
+wp_debug: # 0
+
+DB_USER: alsur_wp #requerido
+DB_PASSWORD: aLC3HCffxMjd #requerido
+DB_HOST: mariadb
+DB_NAME: wordpress #requerido

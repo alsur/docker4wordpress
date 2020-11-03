@@ -1,0 +1,68 @@
+---
+- hosts: all
+  vars_files:
+    - vars_{{ slug }}.yml
+  vars:
+    STARTER_USER: wordpress
+    STARTER_PASSWORD: wordpress
+    STARTER_DB: wordpress
+    STARTER: wp_starter
+    STARTER_DOMAIN: wpstarter.alsur.es
+    DB_NAME: wordpress
+    USING_DOCKER: 1
+  tasks:
+    - name: Copio contenido en la otra ruta
+      shell: rsync -r -aAz --exclude-from '{{ playbook_dir }}/../etc/rsync.ignore' {{ playbook_dir }}/.. {{ PROJECT_DIR }}
+    - name: Renderizar templates
+      template:
+        src: '{{ item.src }}'
+        dest: '{{ item.dest }}'
+      with_items:
+        - src: '{{ PROJECT_DIR }}/etc/apache/apache.template'
+          dest: '{{ PROJECT_DIR }}/etc/apache/wp_{{ PROJECT_NAME }}.conf'
+        - src: '{{ PROJECT_DIR }}/www/wp-config-template.php'
+          dest: '{{ PROJECT_DIR }}/www/wp-config.php'
+        - src: '{{ PROJECT_DIR }}/.env.template'
+          dest: '{{ PROJECT_DIR }}/.env'
+        - src: '{{ PROJECT_DIR }}/.gitignore.wp_project.template'
+          dest: '{{ PROJECT_DIR }}/.gitignore'
+        - src: '{{ PROJECT_DIR }}/playbooks/publish.template.yml'
+          dest: '{{ PROJECT_DIR }}/playbooks/publish.yml'
+        - src: '{{ PROJECT_DIR }}/.gitlab-ci.yml.disabled'
+          dest: '{{ PROJECT_DIR }}/.gitlab-ci.yml'
+        - src: '{{ PROJECT_DIR }}/etc/docker-dump-bbdd-to-init.template.sh'
+          dest: '{{ PROJECT_DIR }}/etc/docker-dump-bbdd-to-init.sh'
+      tags:
+        - templates
+        - files
+        - docker
+    - name: dump docker
+      shell: docker exec -i {{ STARTER }}_mariadb mysqldump -u{{ STARTER_USER }} -p{{ STARTER_PASSWORD }} --databases {{ STARTER_DB }} --skip-comments > {{ PROJECT_DIR }}/docker.d/mysql-init/init.sql
+      register: dumpsql
+      ignore_errors: yes
+    - name: Copia MYSQL manualmente (a causa de error anterior)
+      shell: rsync -r -aAz {{ playbook_dir }}/../docker.d/mysql-init-only-4-starter/init.sql {{ PROJECT_DIR }}/docker.d/mysql-init/init.sql
+      when: "'docker: not found' in dumpsql.stderr OR 'non-zero return code' in msg"
+    - name: Cambiar referencia base de datos
+      lineinfile:
+        dest: '{{ PROJECT_DIR }}/docker.d/mysql-init/init.sql'
+        regexp: '^(.*)`{{ STARTER_DB }}`(.*)$'
+        line: '\1`{{ DB_NAME }}`\2'
+        backrefs: yes
+    - name: Cambiar referencia base de datos (dominio)
+      lineinfile:
+        dest: '{{ PROJECT_DIR }}/docker.d/mysql-init/init.sql'
+        regexp: '^(.*){{ STARTER_DOMAIN }}(.*)$'
+        line: '\1{{ PROJECT_BASE_URL }}\2'
+        backrefs: yes
+    - name: Set permissions (82)
+      shell: bash {{ PROJECT_DIR }}/etc/fix-wordpress-permissions.sh {{ PROJECT_DIR }}/www cont
+    - name: Borrar la carpeta .git
+      file:
+        path: '{{ PROJECT_DIR }}/.git'
+        state: absent
+      tags:
+        - files
+        - docker
+    - name: Limpio archivos que se han copiado en rsync
+      shell: bash {{ PROJECT_DIR }}/etc/clean.sh {{ PROJECT_DIR }}

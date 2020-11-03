@@ -1,3 +1,6 @@
+#wobdy para instalar vanilla Wordpress
+#renombrar a overried para usar
+
 version: "3"
 
 services:

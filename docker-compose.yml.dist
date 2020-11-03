@@ -1,28 +1,18 @@
 version: "3"
 
-#WOBDY
 services:
   mariadb:
     image: wodby/mariadb:$MARIADB_TAG
     container_name: "${PROJECT_NAME}_mariadb"
     stop_grace_period: 30s
     environment:
-      #MYSQL_RANDOM_ROOT_PASSWORD: "yes" #preconf
-      #valores de env o vars defecto
-      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-K9AS9cBaSPTEK8dS}
-      MYSQL_DATABASE: ${DB_NAME:-alsurwp} #wordpress??
-      MYSQL_USER: ${DB_USER:-alsurwp} #wordpress??
-      MYSQL_PASSWORD: ${DB_PASSWORD:-pbvhxy3wAW6VxJTR} 
+      MYSQL_ROOT_PASSWORD: $DB_ROOT_PASSWORD
+      MYSQL_DATABASE: $DB_NAME
+      MYSQL_USER: $DB_USER
+      MYSQL_PASSWORD: $DB_PASSWORD
 #    volumes:
 #    - ./mariadb-init:/docker-entrypoint-initdb.d # Place init .sql file(s) here.
 #    - /path/to/mariadb/data/on/host:/var/lib/mysql # I want to manage volumes manually.
-
-    volumes:
-      - $MYSQL_INIT:/docker-entrypoint-initdb.d # Place init .sql file(s) here.
-      - wp-mysql:/var/lib/mysql # I want to manage volumes manually.
-
-    networks:
-      - common_docker_net      
 
   php:
     image: wodby/wordpress-php:$PHP_TAG
@@ -35,28 +25,6 @@ services:
       DB_NAME: $DB_NAME
       PHP_FPM_USER: wodby
       PHP_FPM_GROUP: wodby
-
-      #alsur valores php ajustados (ver https://kutt.it/NcHrkL)
-      PHP_DATE_TIMEZONE: "Europe/Madrid" #@todo conf de entorno mediante TZ
-      # PHP_MAX_EXECUTION_TIME
-      # PHP_MAX_EXECUTION_TIME
-      # PHP_POST_MAX_SIZE
-      # PHP_UPLOAD_MAX_FILESIZE
-      # GIT_USER_EMAIL
-      # GIT_USER_EMAIL
-
-      # se debe sobreescribir en el override.env
-      # PHP_DISPLAY_ERRORS: Off
-
-
-      #alsur wp-content variables
-      WP_PLUGIN_DIR: $WP_PLUGIN_DIR
-      WP_PLUGIN_URL: $WP_PLUGIN_URL
-      WP_CONTENT_DIR: $WP_CONTENT_DIR
-      WP_CONTENT_URL: $WP_CONTENT_URL
-      USING_DOCKER: 1  #USO? (legacy?)
-
-
 #      # Read instructions at https://wodby.com/docs/stacks/wordpress/local#xdebug
 #      PHP_XDEBUG: 1
 #      PHP_XDEBUG_DEFAULT_ENABLE: 1
@@ -67,23 +35,7 @@ services:
 #      PHP_XDEBUG_REMOTE_HOST: 10.254.254.254 # macOS
 #      PHP_XDEBUG_REMOTE_HOST: 10.0.75.1 # Windows
     volumes:
-    #- ./:/var/www/html:cached
-
-    - $PROJECT_WWW_PATH_BASE:/var/www/html:cached   #cached- base wp
-    - $PROJECT_WWW_PATH_PROJECT/plugins:/var/www/html/$VAR_WP_CONTENT/plugins:cached #carpeta plugins
-    - $PROJECT_WWW_PATH_PROJECT/themes:/var/www/html/$VAR_WP_CONTENT/themes:cached #carpeta themes
-    - $PROJECT_WWW_PATH_PROJECT/wp-config.php:/var/www/html/wp-config.php:cached #wp-config.php
-
-    #nosync
-    -  $PROJECT_WWW_PATH_NOSYNC/uploads:/var/www/html/$VAR_WP_CONTENT/uploads #carpeta themes
-    -  $PROJECT_WWW_PATH_NOSYNC/cache:/var/www/html/$VAR_WP_CONTENT/cache #carpeta themes
-    -  $PROJECT_WWW_PATH_NOSYNC/updraft:/var/www/html/$VAR_WP_CONTENT/updraft #carpeta themes
-    -  $PROJECT_WWW_PATH_NOSYNC/wflogs:/var/www/html/$VAR_WP_CONTENT/wflogs #carpeta themes
-
-    networks:
-      - common_docker_net
-
-
+    - ./:/var/www/html:cached
 ## Alternative for macOS users: Mutagen https://wodby.com/docs/stacks/wordpress/local#docker-for-mac
 #    - mutagen:/var/www/html
 #    # For XHProf and Xdebug profiler traces
@@ -96,8 +48,7 @@ services:
       CRONTAB: "0 * * * * wp cron event run --due-now --path=/var/www/html"
     command: sudo -E LD_PRELOAD=/usr/lib/preloadable_libiconv.so crond -f -d 0
     volumes:
-    #- ./:/var/www/html:cached
-      - $PROJECT_WWW_PATH_BASE:/var/www/html:cached   #cached- base wp
+    - ./:/var/www/html:cached
 
   nginx:
     image: wodby/nginx:$NGINX_TAG
@@ -105,67 +56,24 @@ services:
     depends_on:
     - php
     environment:
-      NGINX_STATIC_OPEN_FILE_CACHE: "off"  #@todo override para dev
-      NGINX_ERROR_LOG_LEVEL: debug  #@todo override para dev
+      NGINX_STATIC_OPEN_FILE_CACHE: "off"
+      NGINX_ERROR_LOG_LEVEL: debug
       NGINX_BACKEND_HOST: php
-      NGINX_VHOST_PRESET: wordpress # vs wordpress (tpl propio con cont instead of wp-content), requiere montaje
+      NGINX_VHOST_PRESET: wordpress
       #NGINX_SERVER_ROOT: /var/www/html/subdir
-
-      #alsur envs de interes - ver https://kutt.it/2CDeQW
-      #NGINX_MODSECURITY_ENABLED
-      #NGINX_PAGESPEED_ENABLE_FILTERS
-      #NGINX_PAGESPEED_ENABLED
-      #NGINX_PAGESPEED_FILE_CACHE_PATH
-      #NGINX_PAGESPEED_REWRITE_LEVEL
-
     volumes:
-    #- ./:/var/www/html:cached
-    # mounts para vhost template de nginx
-    - ./docker.d/etc/gotpl/presets/wordpress_alsur.conf.tmpl:/etc/gotpl/presets/wordpress_alsur.conf.tmpl:cached  
-
-    #mounts de WP 
-    - $PROJECT_WWW_PATH_BASE:/var/www/html:cached   #cached- base wp
-    - $PROJECT_WWW_PATH_PROJECT/plugins:/var/www/html/$VAR_WP_CONTENT/plugins:cached #carpeta plugins
-    - $PROJECT_WWW_PATH_PROJECT/themes:/var/www/html/$VAR_WP_CONTENT/themes:cached #carpeta themes
-    - $PROJECT_WWW_PATH_PROJECT/wp-config.php:/var/www/html/wp-config.php:cached #wp-config.php
-
-    #nosync
-    -  $PROJECT_WWW_PATH_NOSYNC/uploads:/var/www/html/$VAR_WP_CONTENT/uploads #carpeta themes
-    -  $PROJECT_WWW_PATH_NOSYNC/cache:/var/www/html/$VAR_WP_CONTENT/cache #carpeta themes
-    -  $PROJECT_WWW_PATH_NOSYNC/updraft:/var/www/html/$VAR_WP_CONTENT/updraft #carpeta themes
-    -  $PROJECT_WWW_PATH_NOSYNC/wflogs:/var/www/html/$VAR_WP_CONTENT/wflogs #carpeta themes
-
-    #alsur networks
-    networks:
-      - common_docker_net
-
-    # # ports:
-    # - '81:80'
-
-    ## Alternative for macOS users: Mutagen https://wodby.com/docs/stacks/wordpress/local#docker-for-mac
-    #    - mutagen:/var/www/html
-
+    - ./:/var/www/html:cached
+## Alternative for macOS users: Mutagen https://wodby.com/docs/stacks/wordpress/local#docker-for-mac
+#    - mutagen:/var/www/html
     labels:
     - "traefik.http.routers.${PROJECT_NAME}_nginx.rule=Host(`${PROJECT_BASE_URL}`)"
-    #alsur traefik extras @todo quemeloexpliquen 
-    # - traefik.http.middlewares.${PROJECT_NAME}_nginx_https.redirectscheme.scheme=https
-    - traefik.http.routers.${PROJECT_NAME}_nginx.entrypoints=web
-    # - traefik.http.routers.${PROJECT_NAME}_nginx.middlewares=${PROJECT_NAME}_nginx_https@docker
-    # - traefik.http.routers.${PROJECT_NAME}_nginx_https.rule=Host(`${PROJECT_BASE_URL}`)
-    # - traefik.http.routers.${PROJECT_NAME}_nginx_https.tls=true
-    # - traefik.http.routers.${PROJECT_NAME}_nginx_https.entrypoints=web-secure
 
-    - traefik.docker.network=common_docker_net
-    # - traefik.backend=wp
-
-
-  # en common  
-  # mailhog:
-  #   image: mailhog/mailhog
-  #   container_name: "${PROJECT_NAME}_mailhog"
-  #   labels:
-  #   - "traefik.http.services.${PROJECT_NAME}_mailhog.loadbalancer.server.port=8025"
-  #   - "traefik.http.routers.${PROJECT_NAME}_mailhog.rule=Host(`mailhog.${PROJECT_BASE_URL}`)"
+  mailhog:
+    image: mailhog/mailhog
+    container_name: "${PROJECT_NAME}_mailhog"
+    labels:
+    - "traefik.http.services.${PROJECT_NAME}_mailhog.loadbalancer.server.port=8025"
+    - "traefik.http.routers.${PROJECT_NAME}_mailhog.rule=Host(`mailhog.${PROJECT_BASE_URL}`)"
 
 #  postgres:
 #    image: wodby/postgres:$POSTGRES_TAG
@@ -324,24 +232,24 @@ services:
 #    labels:
 #    - "traefik.http.routers.${PROJECT_NAME}_xhprof.rule=Host(`xhprof.${PROJECT_BASE_URL}`)"
 
-#   portainer:
-#     image: portainer/portainer
-#     container_name: "${PROJECT_NAME}_portainer"
-#     command: --no-auth -H unix:///var/run/docker.sock
-#     volumes:
-#     - /var/run/docker.sock:/var/run/docker.sock
-#     labels:
-#     - "traefik.http.routers.${PROJECT_NAME}_portainer.rule=Host(`portainer.${PROJECT_BASE_URL}`)"
+  portainer:
+    image: portainer/portainer
+    container_name: "${PROJECT_NAME}_portainer"
+    command: --no-auth -H unix:///var/run/docker.sock
+    volumes:
+    - /var/run/docker.sock:/var/run/docker.sock
+    labels:
+    - "traefik.http.routers.${PROJECT_NAME}_portainer.rule=Host(`portainer.${PROJECT_BASE_URL}`)"
 
-#   traefik:
-#     image: traefik:v2.0
-#     container_name: "${PROJECT_NAME}_traefik"
-#     command: --api.insecure=true --providers.docker
-#     ports:
-#     - '8000:80'
-# #    - '8080:8080' # Dashboard
-#     volumes:
-#     - /var/run/docker.sock:/var/run/docker.sock
+  traefik:
+    image: traefik:v2.0
+    container_name: "${PROJECT_NAME}_traefik"
+    command: --api.insecure=true --providers.docker
+    ports:
+    - '8000:80'
+#    - '8080:8080' # Dashboard
+    volumes:
+    - /var/run/docker.sock:/var/run/docker.sock
 
 #  mutagen:
 #    build:
@@ -351,52 +259,6 @@ services:
 #    container_name: "mutagen"
 #    volumes:
 #    - mutagen:/var/www/html
-
-# ALSUR
-# @TODO  - TZ=${TIMEZONE}
-
-###### mysql-backup
-  mysql-backup:
-    image:            tiredofit/db-backup:latest
-    volumes:
-    - wp-mysql-backup:/backup/:rw
-    environment:
-    - DB_TYPE=mysql
-    - DB_HOST=mysql
-    - DB_USER=root
-    - DB_PASS=${DB_ROOT_PASSWORD:-K9AS9cBaSPTEK8dS}
-    - DB_DUMP_FREQ=60
-    - DB_DUMP_BEGIN=+10
-    - DB_CLEANUP_TIME=1500
-    - SPLIT_DB=TRUE
-    - MD5=TRUE
-    - COMPRESSION=GZ
-    - PARALLEL_COMPRESSION=FALSE
-    - DEBUG_MODE=FALSE
-    - EXTRA_OPTS=--default-character-set=utf8mb4
-
-    restart:          always
-    # dns:
-    #   - 172.22.1.254
-    sysctls:
-      - net.ipv6.conf.all.disable_ipv6=1
-    # networks:
-    #   - network
-    networks:
-      - common_docker_net
-
-
-
-# ALSUR CONFS
-networks:
-  common_docker_net:
-    external: false
-
-#volumen docker para mysql
-volumes:
-  wp-mysql:
-  wp-mysql-backup:
-
 
 #volumes:
 ## For macOS users (Mutagen)

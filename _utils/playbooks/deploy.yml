@@ -1,0 +1,120 @@
+---
+- hosts: all
+  vars_files:
+    - vars.yml
+  vars:
+    user: existe
+    group: www-data
+    uploads_directory: '/home/webs/wordpress/uploads/{{ PROJECT_NAME }}'
+  become: true
+  #become_user: '{{ user }}'
+  tasks:
+    - name: Renderizar templates
+      template:
+        src: '{{ item.src }}'
+        dest: '{{ item.dest }}'
+        owner: '{{ user }}'
+        group: '{{ group }}'
+      with_items:
+        - src: '{{ playbook_dir }}/../etc/apache/apache.template'
+          dest: '{{ playbook_dir }}/../etc/apache/wp_{{ PROJECT_NAME }}.conf'
+        - src: '{{ playbook_dir }}/../www/wp-config-template.php'
+          dest: '{{ playbook_dir }}/../www/wp-config.php'
+        - src: '{{ playbook_dir }}/../.env.template'
+          dest: '{{ playbook_dir }}/../.env'
+        - src: '{{ playbook_dir }}/../.gitignore.wp_project.template'
+          dest: '{{ playbook_dir }}/../.gitignore'
+      tags:
+        - templates
+        - files
+        - docker
+    - name: Crear carpeta en uploads
+      file:
+        path: '{{ uploads_directory }}'
+        owner: '{{ user }}'
+        group: '{{ group }}'
+        state: directory
+      tags:
+        - files
+    - name: Enlace simbólico a uploads
+      file:
+        src: '{{ uploads_directory }}'
+        dest: '{{ playbook_dir }}/../www/{{ WP_UPLOADS_DIR_PERSO }}'
+        owner: '{{ user }}'
+        group: '{{ group }}'
+        state: link
+      tags:
+        - files
+    - pip:
+        name: PyMySQL
+    - name: Exportar la base de datos
+      mysql_db:
+        name: 'wp_wpstarter'
+        state: dump
+        target: '{{ playbook_dir }}/../docker.d/mysql-init/wordpress_{{ PROJECT_NAME }}.sql'
+        login_host: 'localhost'
+        login_user: 'wordpress'
+        login_password: 'MySQL_Wordpress'
+      tags:
+        - database
+      register: export_database
+    - name: Cambiar referencia base de datos
+      lineinfile:
+        dest: '{{ playbook_dir }}/../docker.d/mysql-init/wordpress_{{ PROJECT_NAME }}.sql'
+        regexp: '^(.*)`wp_wpstarter`(.*)$'
+        line: '\1`{{ DB_NAME }}`\2'
+        backrefs: yes
+    - name: Importar la base de datos
+      mysql_db:
+        name: '{{ DB_NAME }}'
+        state: import
+        target: '{{ playbook_dir }}/../docker.d/mysql-init/wordpress_{{ PROJECT_NAME }}.sql'
+        login_host: '{{ DB_HOST }}'
+        login_user: '{{ DB_USER }}'
+        login_password: '{{ DB_PASSWORD }}'
+      tags:
+        - database
+#    - name: Borrar fichero copia base de datos
+#      file:
+#        path: '{{ playbook_dir }}/../docker.d/mysql-init/wordpress_{{ PROJECT_NAME }}.sql'
+#        state: absent
+#      tags:
+#        - database
+#      when:
+#        export_database is changed
+    - name: Borrar la carpeta .git
+      file:
+        path: '{{ playbook_dir }}/../.git'
+        state: absent
+      tags:
+        - files
+        - docker
+    - name: Enlace simbólico a configuraciones Apache
+      file:
+        state: link
+        src: '{{ playbook_dir }}/../etc/apache/wp_{{ PROJECT_NAME }}.conf'
+        dest: '/etc/apache2/sites-enabled/wp_{{ PROJECT_NAME }}.conf'
+      notify:
+        - Reiniciar Apache
+      tags:
+        - apache
+    - name: Crear carpeta updraft
+      file:
+        path: '/backups/wp-{{ PROJECT_NAME }}'
+        owner: '{{ user }}'
+        group: '{{ group }}'
+        state: directory
+      tags:
+        - files
+    - name: Enlace simbólico a carpeta updraft
+      file:
+        state: link
+        src: '/backups/wp-{{ PROJECT_NAME }}'
+        dest: '{{ playbook_dir }}/../www/{{WP_UPDRAFT_DIR_PERSO}}'
+  handlers:
+    - name: Reiniciar Apache
+      systemd:
+        name: apache2
+        state: reloaded
+      become: true
+      become_user: root

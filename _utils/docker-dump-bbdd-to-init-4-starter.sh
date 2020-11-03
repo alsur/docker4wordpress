@@ -1,0 +1,2 @@
+#docker dump exec para rellenar carpeta mysql-init-only-4-starter que sirve solo para clonar el wpstarter si falla el dump
+docker exec -i wp_starter_mariadb mysqldump -uwordpress -pwordpress --databases wordpress --skip-comments > ../docker.d/mysql-init-only-4-starter/init.sql

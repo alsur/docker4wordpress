@@ -1,0 +1,22 @@
+---
+PROJECT_DIR: # ruta donde se va a crear la copia (absoluta) - se puede usar $PWD (ruta actual)
+PROJECT_NAME: # sin puntos (rompe directivas de traefik)
+PROJECT_BASE_URL: # dominio sin protocolo
+GIT_REPO:
+
+# WP_CONTENT (a partir de www/)
+WP_CONTENT_DIR_PERSO: # default: cont
+WP_PLUGIN_DIR_PERSO: # default: cont/plugins
+WP_CONTENT_URL_PERSO: # default: $protocolo + $host + ‘cont’
+WP_PLUGIN_URL_PERSO: # default: $protocolo + $host + ‘cont/plugins’
+
+wp_debug: # default: false - para el wp-config (true/false)
+
+# VARS para versión home 109 - no se usan en vo docker
+
+DOCUMENT_ROOT: # default: /www 
+
+DB_USER: alsur_wp #requerido
+DB_PASSWORD: aLC3HCffxMjd #requerido
+DB_HOST: mariadb #requerido (mariadb para docker compose)
+DB_NAME: wordpress #requerido

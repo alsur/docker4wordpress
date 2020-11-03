@@ -1,0 +1,11 @@
+.gitignore.wp_project.template
+.gitignore.wp_project.sample
+.env.template
+README_docker4wp.md
+playbooks/publish.template.yml
+playbooks/vars.sample.yml
+etc/apache/apache.template
+etc/apache/wpstarter.alsur.es.conf
+.gitlab-ci.yml.disabled
+docker-dump-bbdd-to-init.template.sh
+docker.d/mysql-init-only-4-starter/

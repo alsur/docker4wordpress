@@ -1,0 +1,41 @@
+---
+# variables en ./hosts_vars/all.yml
+- hosts: all
+  become: true
+  become_user: 'alsur_deploy'
+  vars:
+    - common_key: false
+    - branch: 'master'
+    - user_deploy: 'alsur_deploy'
+    - runner: 'gitlab-runner'
+    - key_file: '/home/{{ '{ { user_deploy } }' }}/.ssh/id_rsa'
+  tasks:
+    - name: Sincronizo ssh key para deploy
+      copy:
+        src: '/home/{{ '{{ runner }}' }}/.ssh/{{ '{{ user_deploy }}' }}/id_rsa'
+        dest: '/tmp/id_common_rsa'
+        mode: '600'
+      when: common_key == 'yes'
+    - set_fact:
+        key_file: '/tmp/id_common_rsa'
+      when: common_key == 'yes'
+    - name: Pull
+      git:
+        repo: '{{ GIT_REPO }}'
+        dest: '{{ PROJECT_DIR }}'
+        key_file: '{{ '{{ key_file }}' }}'
+        accept_hostkey: yes
+        force: yes
+        version: '{{ '{{ branch }}' }}'
+        track_submodules: yes
+      register: pull
+#    - name: Apache | Check the apache configuration
+#      command: apache2ctl configtest
+#      become_user: 'root'
+#    - name: Apache | Reload Apache
+#      service: name=apache2 state=reloaded
+#      become_user: 'root'
+
+
+# apache configtest
+# apache reload si no hay fallos
