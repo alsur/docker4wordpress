@@ -1,0 +1,32 @@
+#override para migrar después a dev o bien mantener y añadir al deploy otro que lo anule
+
+version: "3"
+
+services:
+  php:
+    # image: wodby/wordpress:$WORDPRESS_TAG
+    environment:
+      PHP_FPM_CLEAR_ENV: "no"
+    # volumes:
+    # - codebase:/var/www/html
+
+  mariadb:
+    ports:
+      - '3306:3306'
+
+  crond:
+    # image: wodby/wordpress:$WORDPRESS_TAG
+    environment:
+      PHP_FPM_CLEAR_ENV: "no"
+    # volumes:
+    # - codebase:/var/www/html
+
+  nginx:
+    # volumes:
+    # - codebase:/var/www/html
+    ports:
+      - '81:80'   
+
+
+# volumes:
+#   codebase:

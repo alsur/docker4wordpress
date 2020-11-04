@@ -22,7 +22,10 @@ services:
       - wp-mysql:/var/lib/mysql # I want to manage volumes manually.
 
     networks:
-      - common_docker_net      
+      - backend_wp   
+
+    ports:  #debería ir a override o dev
+      - '3306:3306'   
 
   php:
     image: wodby/wordpress-php:$PHP_TAG
@@ -55,8 +58,6 @@ services:
       WP_CONTENT_DIR: $WP_CONTENT_DIR
       WP_CONTENT_URL: $WP_CONTENT_URL
       USING_DOCKER: 1  #USO? (legacy?)
-
-
 #      # Read instructions at https://wodby.com/docs/stacks/wordpress/local#xdebug
 #      PHP_XDEBUG: 1
 #      PHP_XDEBUG_DEFAULT_ENABLE: 1
@@ -68,7 +69,6 @@ services:
 #      PHP_XDEBUG_REMOTE_HOST: 10.0.75.1 # Windows
     volumes:
     #- ./:/var/www/html:cached
-
     - $PROJECT_WWW_PATH_BASE:/var/www/html:cached   #cached- base wp
     - $PROJECT_WWW_PATH_PROJECT/plugins:/var/www/html/$VAR_WP_CONTENT/plugins:cached #carpeta plugins
     - $PROJECT_WWW_PATH_PROJECT/themes:/var/www/html/$VAR_WP_CONTENT/themes:cached #carpeta themes
@@ -81,23 +81,7 @@ services:
     -  $PROJECT_WWW_PATH_NOSYNC/wflogs:/var/www/html/$VAR_WP_CONTENT/wflogs #carpeta themes
 
     networks:
-      - common_docker_net
-
-
-## Alternative for macOS users: Mutagen https://wodby.com/docs/stacks/wordpress/local#docker-for-mac
-#    - mutagen:/var/www/html
-#    # For XHProf and Xdebug profiler traces
-#    - files:/mnt/files
-
-  crond:
-    image: wodby/wordpress-php:$PHP_TAG
-    container_name: "${PROJECT_NAME}_crond"
-    environment:
-      CRONTAB: "0 * * * * wp cron event run --due-now --path=/var/www/html"
-    command: sudo -E LD_PRELOAD=/usr/lib/preloadable_libiconv.so crond -f -d 0
-    volumes:
-    #- ./:/var/www/html:cached
-      - $PROJECT_WWW_PATH_BASE:/var/www/html:cached   #cached- base wp
+      - backend_wp
 
   nginx:
     image: wodby/nginx:$NGINX_TAG
@@ -108,7 +92,7 @@ services:
       NGINX_STATIC_OPEN_FILE_CACHE: "off"  #@todo override para dev
       NGINX_ERROR_LOG_LEVEL: debug  #@todo override para dev
       NGINX_BACKEND_HOST: php
-      NGINX_VHOST_PRESET: wordpress # vs wordpress (tpl propio con cont instead of wp-content), requiere montaje
+      NGINX_VHOST_PRESET: wordpress_alsur # vs wordpress (tpl propio con cont instead of wp-content), requiere montaje etc
       #NGINX_SERVER_ROOT: /var/www/html/subdir
 
       #alsur envs de interes - ver https://kutt.it/2CDeQW
@@ -118,29 +102,33 @@ services:
       #NGINX_PAGESPEED_FILE_CACHE_PATH
       #NGINX_PAGESPEED_REWRITE_LEVEL
 
+    volumes_from:
+      - php
+
     volumes:
     #- ./:/var/www/html:cached
     # mounts para vhost template de nginx
     - ./docker.d/etc/gotpl/presets/wordpress_alsur.conf.tmpl:/etc/gotpl/presets/wordpress_alsur.conf.tmpl:cached  
 
-    #mounts de WP 
-    - $PROJECT_WWW_PATH_BASE:/var/www/html:cached   #cached- base wp
-    - $PROJECT_WWW_PATH_PROJECT/plugins:/var/www/html/$VAR_WP_CONTENT/plugins:cached #carpeta plugins
-    - $PROJECT_WWW_PATH_PROJECT/themes:/var/www/html/$VAR_WP_CONTENT/themes:cached #carpeta themes
-    - $PROJECT_WWW_PATH_PROJECT/wp-config.php:/var/www/html/wp-config.php:cached #wp-config.php
+    # verificar que funciona el volumes_from
+    # #mounts de WP 
+    # - $PROJECT_WWW_PATH_BASE:/var/www/html:cached   #cached- base wp
+    # - $PROJECT_WWW_PATH_PROJECT/plugins:/var/www/html/$VAR_WP_CONTENT/plugins:cached #carpeta plugins
+    # - $PROJECT_WWW_PATH_PROJECT/themes:/var/www/html/$VAR_WP_CONTENT/themes:cached #carpeta themes
+    # - $PROJECT_WWW_PATH_PROJECT/wp-config.php:/var/www/html/wp-config.php:cached #wp-config.php
 
-    #nosync
-    -  $PROJECT_WWW_PATH_NOSYNC/uploads:/var/www/html/$VAR_WP_CONTENT/uploads #carpeta themes
-    -  $PROJECT_WWW_PATH_NOSYNC/cache:/var/www/html/$VAR_WP_CONTENT/cache #carpeta themes
-    -  $PROJECT_WWW_PATH_NOSYNC/updraft:/var/www/html/$VAR_WP_CONTENT/updraft #carpeta themes
-    -  $PROJECT_WWW_PATH_NOSYNC/wflogs:/var/www/html/$VAR_WP_CONTENT/wflogs #carpeta themes
+    # #nosync
+    # -  $PROJECT_WWW_PATH_NOSYNC/uploads:/var/www/html/$VAR_WP_CONTENT/uploads #carpeta themes
+    # -  $PROJECT_WWW_PATH_NOSYNC/cache:/var/www/html/$VAR_WP_CONTENT/cache #carpeta themes
+    # -  $PROJECT_WWW_PATH_NOSYNC/updraft:/var/www/html/$VAR_WP_CONTENT/updraft #carpeta themes
+    # -  $PROJECT_WWW_PATH_NOSYNC/wflogs:/var/www/html/$VAR_WP_CONTENT/wflogs #carpeta themes
 
     #alsur networks
     networks:
-      - common_docker_net
-
-    # # ports:
-    # - '81:80'
+      - backend_wp
+      
+    ports:  #debería ir a override o dev
+    - '81:80'   
 
     ## Alternative for macOS users: Mutagen https://wodby.com/docs/stacks/wordpress/local#docker-for-mac
     #    - mutagen:/var/www/html
@@ -155,9 +143,19 @@ services:
     # - traefik.http.routers.${PROJECT_NAME}_nginx_https.tls=true
     # - traefik.http.routers.${PROJECT_NAME}_nginx_https.entrypoints=web-secure
 
-    - traefik.docker.network=common_docker_net
+    - traefik.docker.network=backend_wp
     # - traefik.backend=wp
 
+
+  crond:
+    image: wodby/wordpress-php:$PHP_TAG
+    container_name: "${PROJECT_NAME}_crond"
+    environment:
+      CRONTAB: "0 * * * * wp cron event run --due-now --path=/var/www/html"
+    command: sudo -E LD_PRELOAD=/usr/lib/preloadable_libiconv.so crond -f -d 0
+    volumes:
+    #- ./:/var/www/html:cached
+      - $PROJECT_WWW_PATH_BASE:/var/www/html:cached   #cached- base wp
 
   # en common  
   # mailhog:
@@ -358,6 +356,7 @@ services:
 ###### mysql-backup
   mysql-backup:
     image:            tiredofit/db-backup:latest
+    container_name: "${PROJECT_NAME}_db-backup"
     volumes:
     - wp-mysql-backup:/backup/:rw
     environment:
@@ -383,20 +382,28 @@ services:
     # networks:
     #   - network
     networks:
-      - common_docker_net
+      - backend_wp
 
 
 
 # ALSUR CONFS
 networks:
-  common_docker_net:
-    external: false
+#de common
+  front:
+    name: front #red con puertos abiertos
+  # backend:
+  #   name: containers #red interna entre contenedores 1
+  backend_wp:
+    name: containers_wp #red interna aislada para contanedores wp
 
 #volumen docker para mysql
 volumes:
   wp-mysql:
+    name: ${PROJECT_NAME}-mysql # Real ending name
+    external: false
   wp-mysql-backup:
-
+    name: ${PROJECT_NAME}-mysql-backup # Real ending name
+    external: false
 
 #volumes:
 ## For macOS users (Mutagen)
