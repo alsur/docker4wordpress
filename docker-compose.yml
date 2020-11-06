@@ -1,5 +1,24 @@
 version: "3"
 
+# CONFS
+networks:
+#de common
+  traefik_net:
+    name: traefik_net
+    external: true
+
+  containers_wp:
+    name: containers_wp #red con puertos abiertos  
+
+#volumen docker para mysql
+volumes:
+  wp-mysql:
+    name: ${PROJECT_NAME}-mysql # Real ending name
+    external: false
+  wp-mysql-backup:
+    name: ${PROJECT_NAME}-mysql-backup # Real ending name
+    external: false
+
 #WOBDY
 services:
   mariadb:
@@ -22,7 +41,7 @@ services:
       - wp-mysql:/var/lib/mysql # I want to manage volumes manually.
 
     networks:
-      - backend_wp   
+      - containers_wp   
 
     ports:  #debería ir a override o dev
       - '3306:3306'   
@@ -81,7 +100,7 @@ services:
     -  $PROJECT_WWW_PATH_NOSYNC/wflogs:/var/www/html/$VAR_WP_CONTENT/wflogs #carpeta themes
 
     networks:
-      - backend_wp
+      - containers_wp
 
   nginx:
     image: wodby/nginx:$NGINX_TAG
@@ -125,25 +144,37 @@ services:
 
     #alsur networks
     networks:
-      - backend_wp
+      - traefik_net
+      - containers_wp
       
     ports:  #debería ir a override o dev
     - '81:80'   
 
     ## Alternative for macOS users: Mutagen https://wodby.com/docs/stacks/wordpress/local#docker-for-mac
     #    - mutagen:/var/www/html
-
     labels:
-    - "traefik.http.routers.${PROJECT_NAME}_nginx.rule=Host(`${PROJECT_BASE_URL}`)"
-    #alsur traefik extras @todo quemeloexpliquen 
-    # - traefik.http.middlewares.${PROJECT_NAME}_nginx_https.redirectscheme.scheme=https
-    - traefik.http.routers.${PROJECT_NAME}_nginx.entrypoints=web
-    # - traefik.http.routers.${PROJECT_NAME}_nginx.middlewares=${PROJECT_NAME}_nginx_https@docker
+      - traefik.enable=true # activar
+      - traefik.http.routers.${PROJECT_NAME}_nginx.entrypoints=websecure 
+      - traefik.http.routers.${PROJECT_NAME}_nginx.rule=Host(`${PROJECT_BASE_URL}`) #tiene que resolverse a nivel del docker server
+      - traefik.http.routers.${PROJECT_NAME}_nginx.tls.certresolver=le #resolver para certificado (definido en traefik)
+
+      - traefik.http.services.${PROJECT_NAME}_nginx.loadbalancer.server.port=80 #test x si abriera más de uno
+      - traefik.http.routers.whoami.tls=true #aceptar exclusivamente https
+
+      - traefik.docker.network=traefik_net #test por si se lia!!!!
+
+    # labels:
+    # - traefik.http.routers.${PROJECT_NAME}_nginx.rule=Host(`${PROJECT_BASE_URL}`)
+    # - traefik.http.routers.${PROJECT_NAME}_nginx.entrypoints=web
     # - traefik.http.routers.${PROJECT_NAME}_nginx_https.rule=Host(`${PROJECT_BASE_URL}`)
     # - traefik.http.routers.${PROJECT_NAME}_nginx_https.tls=true
     # - traefik.http.routers.${PROJECT_NAME}_nginx_https.entrypoints=web-secure
 
-    - traefik.docker.network=backend_wp
+    # - traefik.http.routers.${PROJECT_NAME}_nginx.middlewares=${PROJECT_NAME}_nginx_https@docker
+    # - traefik.http.middlewares.${PROJECT_NAME}_nginx_https.redirectscheme.scheme=https
+
+
+    # - traefik.docker.network=backend_wp
     # - traefik.backend=wp
 
 
@@ -156,6 +187,48 @@ services:
     volumes:
     #- ./:/var/www/html:cached
       - $PROJECT_WWW_PATH_BASE:/var/www/html:cached   #cached- base wp
+
+
+###### mysql-backup
+  mysql-backup:
+    image: tiredofit/db-backup:latest
+    container_name: "${PROJECT_NAME}_db-backup"
+    volumes:
+    - wp-mysql-backup:/backup/:rw
+    environment:
+    - DB_TYPE=mysql
+    - DB_HOST=mariadb
+    - DB_USER=root
+    - DB_PASS=${DB_ROOT_PASSWORD:-K9AS9cBaSPTEK8dS}
+    - DB_DUMP_FREQ=60
+    - DB_DUMP_BEGIN=+10
+    - DB_CLEANUP_TIME=1500
+    - SPLIT_DB=TRUE
+    - MD5=TRUE
+    - COMPRESSION=GZ
+    - PARALLEL_COMPRESSION=FALSE
+    - DEBUG_MODE=FALSE
+    - EXTRA_OPTS=--default-character-set=utf8mb4
+
+    restart:          always
+    # dns:
+    #   - 172.22.1.254
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=1
+    # networks:
+    #   - network
+    networks:
+      - containers_wp
+
+
+#volumes:
+## For macOS users (Mutagen)
+#  mutagen:
+## For Xdebug profiler
+#  files:
+
+
+
 
   # en common  
   # mailhog:
@@ -353,60 +426,3 @@ services:
 # ALSUR
 # @TODO  - TZ=${TIMEZONE}
 
-###### mysql-backup
-  mysql-backup:
-    image:            tiredofit/db-backup:latest
-    container_name: "${PROJECT_NAME}_db-backup"
-    volumes:
-    - wp-mysql-backup:/backup/:rw
-    environment:
-    - DB_TYPE=mysql
-    - DB_HOST=mysql
-    - DB_USER=root
-    - DB_PASS=${DB_ROOT_PASSWORD:-K9AS9cBaSPTEK8dS}
-    - DB_DUMP_FREQ=60
-    - DB_DUMP_BEGIN=+10
-    - DB_CLEANUP_TIME=1500
-    - SPLIT_DB=TRUE
-    - MD5=TRUE
-    - COMPRESSION=GZ
-    - PARALLEL_COMPRESSION=FALSE
-    - DEBUG_MODE=FALSE
-    - EXTRA_OPTS=--default-character-set=utf8mb4
-
-    restart:          always
-    # dns:
-    #   - 172.22.1.254
-    sysctls:
-      - net.ipv6.conf.all.disable_ipv6=1
-    # networks:
-    #   - network
-    networks:
-      - backend_wp
-
-
-
-# ALSUR CONFS
-networks:
-#de common
-  front:
-    name: front #red con puertos abiertos
-  # backend:
-  #   name: containers #red interna entre contenedores 1
-  backend_wp:
-    name: containers_wp #red interna aislada para contanedores wp
-
-#volumen docker para mysql
-volumes:
-  wp-mysql:
-    name: ${PROJECT_NAME}-mysql # Real ending name
-    external: false
-  wp-mysql-backup:
-    name: ${PROJECT_NAME}-mysql-backup # Real ending name
-    external: false
-
-#volumes:
-## For macOS users (Mutagen)
-#  mutagen:
-## For Xdebug profiler
-#  files:
